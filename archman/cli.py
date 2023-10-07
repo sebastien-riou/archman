@@ -74,35 +74,45 @@ def cmd_update(args):
 def cmd_args_list(args):
     print(cmd_list(src=args.src,recursive=args.recursive),end='')
 
+def cmd_list_core(*, archive:Archive, path:Path, indent:str, content:dict) -> str:
+    out = io.StringIO()
+    def p(*args, **kwargs):
+        print(indent,*args,**kwargs,file=out)
+    print("cmd_list_core:",content.values())
+    print("%s %d dirs"%(path,len(content['dirs'])))
+    for d in content['dirs']:
+        print(d[1].name)
+    indent_unit = '  '
+    if len(content['dirs']) > 0 and len(content['dirs'][0]) == 3:
+        for (uid,child,child_content) in content['dirs']:
+            p('d',child.name)
+            child_str = cmd_list_core(
+                archive=archive, 
+                path=path.joinpath(child.name),
+                indent=indent+indent_unit, 
+                content=child_content)
+            print(child_str,end='',file=out)
+    else:
+        for (uid,child) in content['dirs']:
+            p('d',child.name)
+    for (uid,child) in content['files']:
+        p('-',child.name)
+    return out.getvalue()
+    
 def cmd_list(*, src:str, recursive:bool=False, hardlinks:bool=False) -> str:
-    if hardlinks or recursive:
+    if hardlinks:
         raise NotImplementedError()
     if not os.path.isdir(src):
         raise NotADirectoryError(src)
     root = Archive.get_archive_root(src)
     archive = Archive(str(root))
     out = io.StringIO()
-    print("list of '"+str(Path(src).resolve())+"'",file=out)
-    res = archive.list(src)
-    indent_unit = '  '
-    for data in res.values():
-        rel_path = data['rel_path']
-        folders = data['folders']
-        files = data['files']
-        parts = Path(rel_path).parts
-        indent = indent_unit*len(parts)
-        def p(*args, **kwargs):
-            print(indent,*args,**kwargs,file=out)
-        if len(parts)>0:
-            p(parts[-1])
-        else:
-            p(rel_path)
-        #indent += indent_unit
-        for (uid,child) in folders:
-            p('d',child.name)
-        for (uid,child) in files:
-            p('-',child.name)
-    return out.getvalue()
+    path = str(Path(src).resolve())
+    print("list of '"+path+"'",file=out)
+    res = archive.list(src, recursive=recursive)
+    rel_path = Path(src).resolve().relative_to(root.joinpath(params.DATA_FOLDER))
+    print(" %s"%str(rel_path), file=out)
+    return out.getvalue()+cmd_list_core(archive=archive,path=rel_path, indent='', content=res)
     
 def cmd_dedup(args):
     print(args)

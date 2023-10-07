@@ -1,0 +1,58 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Debug Tests",
+            "type": "python",
+            "request": "launch",
+            "module": "test.test_cli2",
+            "purpose": ["debug-test"],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Python: old Debug Tests",
+            "type": "python",
+            "request": "attach",
+            "purpose": ["debug-test"],
+            "console": "externalTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "create",
+            "type": "python",
+            "request": "launch",
+            "module": "archman.cli",
+            "justMyCode": true,
+            "args": ["new","playground"]
+        },
+        {
+            "name": "list",
+            "type": "python",
+            "request": "launch",
+            "module": "archman.cli",
+            "justMyCode": true,
+            "args": ["list","playground/data"]
+        },
+        {
+            "name": "add file",
+            "type": "python",
+            "request": "launch",
+            "module": "archman.cli",
+            "justMyCode": false,
+            "args": ["add","README.md","playground/data/README.md"]
+        }
+        ,
+        {
+            "name": "add folder",
+            "type": "python",
+            "request": "launch",
+            "module": "archman.cli",
+            "justMyCode": false,
+            "args": ["add","docs","playground/data/docs","--recursive"]
+        }
+    ]
+}

@@ -62,24 +62,23 @@ class Archive(object):
         self.check_file = self.root_path.joinpath(params.INDEX_FOLDER,params.CHECK_FILE)
         self.check = RepairInfo(self.check_file, self.db_file)
 
-    def list_id(self, folder_id, recursive = False):
-        out = {}
-        folders = self.db.folders(parent_id=folder_id)
+    def list_id(self, dir_id, recursive = False):
+        dirs = list(self.db.folders(parent_id=dir_id))
+        files = list(self.db.files(parent_id=dir_id))   
+        out = {'dirs':dirs, 'files':files}     
         if recursive:
-            for (uid,child) in folders:
-                sub_list = self.list_id(uid, recursive=True)[uid]
-                for d in sub_list['folders']:
-                    d['rel_path'] = str(Path(child.name).joinpath(d['rel_path']))
-                out[uid] = {'rel_path':child.name, 'folders':sub_list['folders'], 'files':sub_list['files']} 
-        files = self.db.files(parent_id=folder_id)   
-        rel_path = '.'
-        out[folder_id] = {'rel_path':rel_path, 'folders':folders, 'files':files}     
+            rec_dirs = []
+            for (uid,child) in dirs:
+                content = self.list_id(uid, recursive=True)
+                item = (uid,child,content)
+                rec_dirs.append(item) 
+            out['dirs'] = rec_dirs
         return out
     
     def list(self, path, recursive = False):
         out = {}
-        parent_id = self.db.folder_from_path(path)[0]
-        return self.list_id(parent_id,recursive=recursive)
+        dir_id = self.db.folder_from_path(path)[0]
+        return self.list_id(dir_id,recursive=recursive)
     
     def add_file(self, src: str, dst:str) -> None:
         src_file = Path(src).name

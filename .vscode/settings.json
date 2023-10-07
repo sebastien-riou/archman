@@ -1,0 +1,10 @@
+{
+    "python.testing.pytestArgs": [
+        "-s",
+        "--log-level=INFO",
+        "test"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "justMyCode": false
+}

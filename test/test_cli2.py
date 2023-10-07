@@ -65,6 +65,8 @@ def check_list_empty():
     expected += """
  .
 """
+    print(expected)
+    print(out)
     assert out == expected
 
 def check_list_1file():
@@ -78,6 +80,8 @@ def check_list_1file():
  .
  - f0000
 """
+    print(expected)
+    print(out)
     assert out == expected
 
 def check_list_1dir():
@@ -110,12 +114,14 @@ def check_list_nested_dir():
     out = cli.cmd_list(src=data)
     assert out == expected
     out = cli.cmd_list(src=data, recursive=True)
-    expected = "list of '"+str(data)+"'"
+    expected = "list of '"+str(data.absolute())+"'"
     expected += """
  .
  d d0000
    d d0001
 """
+    print(expected)
+    print(out)
     assert out == expected
 
 def test_it():

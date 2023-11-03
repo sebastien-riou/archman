@@ -9,11 +9,14 @@ from seedir import FakeDir,FakeFile
 import seedir
 import io
 import difflib
+from filecmp import dircmp
+import filecmp
 
 test_root = Path('playground')
 archive_root = test_root / 'archive_root'
 fixtures_root = test_root / 'fixtures'
 files_path = fixtures_root / "files"
+out_path = test_root / "out"
 random_tree_name = "random_tree"
 random_tree_root = test_root.joinpath(random_tree_name)
 
@@ -54,9 +57,10 @@ def rmtree(path):
 
     shutil.rmtree(path, onerror=remove_readonly)
 
-
 def clean():
     rmtree(str(archive_root))
+    rmtree(str(out_path))
+    out_path.mkdir()
 
 def gen_list_expected_output(path:Path, recursive = False, max_depth=None):
     expected = io.StringIO()
@@ -91,13 +95,41 @@ def check_list_generic():
     clean()
     cli.cmd_new(dst=str(archive_root))
     expected = gen_list_expected_output(random_tree_root,recursive=True)
-    cli.cmd_add(src=random_tree_root,dst=archive_root / random_tree_name, recursive=True)
-    out = cli.cmd_list(src=archive_root / random_tree_name,recursive=True)
+    dst = archive_root / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=dst, recursive=True)
+    out = cli.cmd_list(src=dst,recursive=True)
     check_str_equal(out,expected)
+    cmp = dircmp(random_tree_root,dst)
+    assert 0 == len(cmp.left_only)
+    assert 0 == len(cmp.diff_files)
+
+def check_export_dir():
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    arch = archive_root / random_tree_name
+    out = out_path / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    cli.cmd_export(src=arch, dst=out, recursive=True)
+    cmp = dircmp(random_tree_root,out)
+    assert 0 == len(cmp.left_only)
+    assert 0 == len(cmp.diff_files)
+
+def check_export_file():
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    file_name = 'f0000'
+    org = files_path / file_name
+    arch = archive_root / file_name
+    out = out_path / file_name
+    cli.cmd_add(src=org, dst=arch)
+    cli.cmd_export(src=arch, dst=out)
+    assert filecmp.cmp(org,out,shallow=False)
 
 def test_it():
     check_list_empty()
     check_list_generic()
+    check_export_file()
+    check_export_dir()
 
 
 if __name__ == '__main__':

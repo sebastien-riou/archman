@@ -3,7 +3,6 @@ import logging
 import os
 from pathlib import Path, PurePath
 import io
-#from archman import Archive
 from archman.dummyarchive import DummyArchive as ArchiveImpl
            
 def check_recursive(*, path:str, recursive:bool):
@@ -65,8 +64,16 @@ def cmd_rename(args):
 def cmd_move(args):
     print(args)
 
-def cmd_export(args):
-    print(args)
+def cmd_args_export(args):
+    pass
+
+def cmd_export(*,src:str, dst:str, recursive:bool=False):
+    check_recursive(path=src,recursive=recursive)
+    archive = path_to_archive(src)
+    if recursive:
+        archive.export_dir(src=src, dst=dst)
+    else:
+        archive.export_file(src=src, dst=dst)
 
 def cmd_update(args):
     print(args)
@@ -195,7 +202,8 @@ if __name__ == '__main__':
     parser_move.add_argument('dst', help='Destination directory path', type=str)
     
     # export command
-    parser_export.add_argument('--out', help='Specify the output path', default='stdout', type=str)
+    parser_export.add_argument('src', help='Source path', type=str)
+    parser_export.add_argument('dst', help='Destination path', type=str)
     
     # update command
     parser_update.add_argument('src', help='Source path', type=str)

@@ -121,4 +121,38 @@ class DummyArchive(Archive):
     
     def commit(self) -> None:
         pass
+    
+    def export_file(self, src:str, dst:str) -> None:
+        src_file = Path(src).name
+        s_parent = Path(src).parent.resolve()
+        s = s_parent.joinpath(src_file)
+        d = Path(dst).resolve()
+        d_parent = d.parent
+        logging.info('exporting ' + str(s) + ' to ' + str(d) + ' from archive' + str(self.root_path))
+        if not s.exists():
+            raise FileNotFoundError(str(s))
+        if not s.is_file():
+            raise NotAFileError(str(s))
+        if d.exists():
+            raise FileExistsError(str(d))
+        if not d_parent.exists():
+            raise FileNotFoundError(str(d_parent))
         
+        shutil.copyfile(src=s,dst=d,follow_symlinks=False) # TODO: handle symlinks
+
+    def export_dir(self, src: str, dst:str) -> None:
+        src_file = Path(src).name
+        s_parent = Path(src).parent.resolve()
+        s = s_parent.joinpath(src_file)
+        d = Path(dst).resolve()
+        d_parent = d.parent
+        logging.info('exporting ' + str(s) + ' to ' + str(d) + ' from archive' + str(self.root_path))
+        if not s.exists():
+            raise FileNotFoundError(str(s))
+        if s.is_file():
+            raise NotADirectoryError(str(s))
+        if d.exists():
+            raise FileExistsError(str(d))
+        if not d_parent.exists():
+            raise FileNotFoundError(str(d_parent))
+        shutil.copytree(src=s,dst=d,symlinks=False) # TODO: handle symlinks

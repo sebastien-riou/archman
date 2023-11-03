@@ -3,8 +3,8 @@ import logging
 import os
 from pathlib import Path, PurePath
 import io
-from archman import Archive
-from archman import params
+#from archman import Archive
+from archman.dummyarchive import DummyArchive as ArchiveImpl
            
 def check_recursive(*, path:str, recursive:bool):
     isdir = os.path.isdir(path)
@@ -26,15 +26,15 @@ def check_dir(*, path:str, expected_to_exist=True):
             raise NotADirectoryError(path)
 
 def path_to_archive(path):
-    root = Archive.get_archive_root(path)
-    return Archive(root)
+    root = ArchiveImpl.get_archive_root(path)
+    return ArchiveImpl(root)
 
 def cmd_args_new(args):
     cmd_new(dst=args.dst)
 
 def cmd_new(*, dst:str) -> None:
     check_dir(path=dst,expected_to_exist=False)
-    Archive.create_archive(dst)
+    ArchiveImpl.create_archive(dst)
 
 def cmd_args_mkdir(args):
     cmd_mkdir(dst=args.dst)
@@ -74,29 +74,45 @@ def cmd_update(args):
 def cmd_args_list(args):
     print(cmd_list(src=args.src,recursive=args.recursive),end='')
 
-def cmd_list_core(*, archive:Archive, path:Path, indent:str, content:dict) -> str:
+def cmd_list_core(*, archive:ArchiveImpl, path:Path, content:dict, parents_last=[]) -> str:
     out = io.StringIO()
+    depth = len(parents_last)
+    extend = '│ '
+    extend_last = '  '
     def p(*args, **kwargs):
-        print(indent,*args,**kwargs,file=out)
-    print("cmd_list_core:",content.values())
-    print("%s %d dirs"%(path,len(content['dirs'])))
-    for d in content['dirs']:
-        print(d[1].name)
-    indent_unit = '  '
-    if len(content['dirs']) > 0 and len(content['dirs'][0]) == 3:
-        for (uid,child,child_content) in content['dirs']:
-            p('d',child.name)
-            child_str = cmd_list_core(
-                archive=archive, 
-                path=path.joinpath(child.name),
-                indent=indent+indent_unit, 
-                content=child_content)
-            print(child_str,end='',file=out)
-    else:
-        for (uid,child) in content['dirs']:
-            p('d',child.name)
-    for (uid,child) in content['files']:
-        p('-',child.name)
+        header = ""
+        for i in range(0,depth):
+            if parents_last[i]:
+                header += extend_last
+            else:
+                header += extend
+        line = header + ' '.join(args)
+        print(line,**kwargs,file=out)
+    nfiles = len(content['files'])
+    for i in range(0,len(content['dirs'])):
+        (child,child_content) = content['dirs'][i]
+        if 0 < nfiles:
+            last = False
+        else:
+            last = i + 1 == len(content['dirs'])
+        mark = '├─'
+        if last:
+            mark = '└─'
+        p(mark+child.name+'/')
+        child_last = parents_last + [last]
+        child_str = cmd_list_core(
+            archive=archive, 
+            path=path.joinpath(child.name), 
+            content=child_content,
+            parents_last = child_last)
+        print(child_str,end='',file=out)
+    for i in range(0,nfiles):
+        child = content['files'][i]
+        last = i + 1 == nfiles
+        mark = '├─'
+        if last:
+            mark = '└─'
+        p(mark+child.name)
     return out.getvalue()
     
 def cmd_list(*, src:str, recursive:bool=False, hardlinks:bool=False) -> str:
@@ -104,18 +120,25 @@ def cmd_list(*, src:str, recursive:bool=False, hardlinks:bool=False) -> str:
         raise NotImplementedError()
     if not os.path.isdir(src):
         raise NotADirectoryError(src)
-    root = Archive.get_archive_root(src)
-    archive = Archive(str(root))
+    root = ArchiveImpl.get_archive_root(src)
+    assert root.is_absolute()
+    archive = ArchiveImpl(str(root))
     out = io.StringIO()
-    path = str(Path(src).resolve())
-    print("list of '"+path+"'",file=out)
-    res = archive.list(src, recursive=recursive)
-    rel_path = Path(src).resolve().relative_to(root.joinpath(params.DATA_FOLDER))
-    print(" %s"%str(rel_path), file=out)
-    return out.getvalue()+cmd_list_core(archive=archive,path=rel_path, indent='', content=res)
+    path = Path(src).resolve()
+    print("archive '"+str(root)+"':",file=out)
+    res = archive.list(path, recursive=recursive)
+    rel_path = path.relative_to(root.parent)
+    mark=''
+    if archive.is_dir(rel_path):
+        mark='/'
+    print(str(rel_path.parts[-1])+mark, file=out)
+    return out.getvalue()+cmd_list_core(archive=archive,path=rel_path,content=res)
     
 def cmd_dedup(args):
     print(args)
+
+def get_archive_impl_files():
+    return ArchiveImpl.get_impl_files()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='archman.cli')

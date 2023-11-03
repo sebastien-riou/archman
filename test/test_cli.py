@@ -1,5 +1,5 @@
 from archman import cli
-from archman import params
+from archman.sqlarchive import params
 import pytest
 import os
 

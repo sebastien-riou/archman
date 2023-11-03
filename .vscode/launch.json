@@ -8,7 +8,7 @@
             "name": "Python: Debug Tests",
             "type": "python",
             "request": "launch",
-            "module": "test.test_cli2",
+            "module": "test.test_cli3",
             "purpose": ["debug-test"],
             "console": "integratedTerminal",
             "justMyCode": false

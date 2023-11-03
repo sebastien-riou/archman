@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Generator
 from typing import Tuple
 from typing import Iterator
-from archman import params
+from archman.sqlarchive import params
 class DbUtils(object):
     @staticmethod
     def create_connection(db_file, *, create = False):

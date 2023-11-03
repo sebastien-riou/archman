@@ -1,9 +1,10 @@
 from archman import cli
-from archman import params
+from archman.sqlarchive import params
 import os
 import stat
 from pathlib import Path
 import shutil
+import random
 
 test_root = Path('playground')
 archive_root = test_root / 'archive_root'
@@ -55,6 +56,16 @@ def rmtree1(path):
 
 def clean():
     rmtree(str(archive_root))
+import seedir
+def gen_list_expected_output(path:Path, recursive = False, max_depth=None):
+    expected = io.StringIO()
+    print("archive '%s':"%str(archive_root.absolute()),file=expected)
+    rel_path = path.relative_to(archive_root)
+    rel_path = Path(rel_path).parent
+    if str(rel_path) != ".":
+        print(rel_path,end="/",file=expected)
+    print(seedir.seedir(path=path, printout=False),file=expected)
+    return expected.getvalue()
 
 def check_list_empty():
     clean()
@@ -68,6 +79,7 @@ def check_list_empty():
     print(expected)
     print(out)
     assert out == expected
+    print(gen_list_expected_output(data,recursive=True))
 
 def check_list_1file():
     clean()
@@ -83,6 +95,7 @@ def check_list_1file():
     print(expected)
     print(out)
     assert out == expected
+    print(gen_list_expected_output(data,recursive=True))
 
 def check_list_1dir():
     clean()
@@ -96,6 +109,7 @@ def check_list_1dir():
  d d0000
 """
     assert out == expected
+    print(gen_list_expected_output(data,recursive=True))
 
 def check_list_nested_dir():
     clean()
@@ -123,12 +137,43 @@ def check_list_nested_dir():
     print(expected)
     print(out)
     assert out == expected
+    print(gen_list_expected_output(data,recursive=True))
+    print(gen_list_expected_output(data / 'd0000',recursive=True))
+
+import math
+import io
+def check_list_generic(max_depth=3, nfiles=10, ndirs=10):
+    clean()
+    ave_files_per_dir = math.ceil(nfiles / ndirs)
+    max_files_per_dir = 2*ave_files_per_dir
+    random.seed(0)
+    cli.cmd_new(dst=str(archive_root))
+    data = archive_root.joinpath(params.DATA_FOLDER)
+    expected = io.StringIO()
+    print("list of '"+str(data.absolute())+"'",file=expected)
+    indent = ' '
+    indent_unit = '  '
+    for i in range(0,ndirs):
+        remaining = ndirs-i
+        level = min(remaining,random.randint(1,max_depth))
+        path = data
+        for j in range(0,level):
+            id = i+j
+            name = 'd%04d'%id
+            path = path.joinpath(name)
+            cli.cmd_add(src=dirs_path / name,dst=path, recursive=True)
+
+    out = cli.cmd_list(src=data)
+    print(expected)
+    print(out)
+    assert out == expected
 
 def test_it():
     check_list_empty()
     check_list_1file()
     check_list_1dir()
     check_list_nested_dir()
+    check_list_generic()
 
 
 if __name__ == '__main__':

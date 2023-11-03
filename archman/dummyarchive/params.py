@@ -1,0 +1,3 @@
+INDEX_FILE = '.dummyarchive'
+READ_ONLY = 0o511
+READ_WRITE = 0o777

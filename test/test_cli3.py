@@ -20,9 +20,27 @@ out_path = test_root / "out"
 random_tree_name = "random_tree"
 random_tree_root = test_root.joinpath(random_tree_name)
 
+def randomdir(*,root,name,seed=0,size_mb=1):
+    dirs = seedir.randomdir(name=name,seed=seed)
+    nfiles = 0
+    size = size_mb * 1024 * 1024
+    dirs.realize(root)
+    for path, dirs, files in os.walk(root / name):
+        for f in files:
+            nfiles += 1
+    average_size = size // nfiles
+    remaining = size
+    random.seed(seed)
+    for path, dirs, files in os.walk(root / name):
+        for f in files:
+            file_size = min(remaining,random.randint(0,2*average_size))
+            remaining -= file_size
+            with open(os.path.join(path,f),'wb') as file:
+                file.write(random.randbytes(file_size))
+            
+
 if not random_tree_root.exists():    
-    model = seedir.randomdir(name=random_tree_name,seed=0)
-    model.realize(test_root)
+    randomdir(root=test_root,name=random_tree_name)
 
 if not files_path.exists():
     files_path.mkdir(parents=True)

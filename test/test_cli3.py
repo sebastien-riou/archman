@@ -241,6 +241,26 @@ def check_delete():
     FsUtils.rmtree(tmp / dorg) 
     check_dirs_equal(tmp,arch)
 
+def check_update():
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    arch = archive_root / random_tree_name
+    out = out_path / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    for root,dirs,files in os.walk(random_tree_root):
+        forg = os.path.join(root,files[0])
+        break
+    forg = Path(forg).relative_to(random_tree_root)
+    content = PrngSha256().randbytes(12)
+    tmp = out_path / 'expected'
+    shutil.copytree(random_tree_root,tmp)
+    with open(tmp / forg,'wb')as file:
+        file.write(content)
+    cli.cmd_update(src=tmp / forg, dst=arch / forg)
+    cli.cmd_export(src=arch, dst=out, recursive=True)
+    check_dirs_equal(tmp,arch)
+
+
 def test_it():
     check_list_empty()
     check_list_generic()
@@ -249,6 +269,7 @@ def test_it():
     check_dedup_remove()
     check_move()
     check_delete()
+    check_update()
 
 
 if __name__ == '__main__':

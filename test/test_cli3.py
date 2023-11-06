@@ -22,13 +22,14 @@ random_tree_name = "random_tree"
 random_tree_root = test_root.joinpath(random_tree_name)
 
 
-def check_randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
+def check_randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0,n_soft_links=0):
     dirs = seedir.randomdir(name=name,seed=seed)
     nfiles = 0
     size = size_mb * 1024 * 1024
     for path, dirs, files in os.walk(root / name):
         for f in files:
-            nfiles += 1
+            if not os.path.islink(os.path.join(path,f)):
+                nfiles += 1
     average_size = size // nfiles
     remaining = size
     dat_rng = PrngSha256(seed)
@@ -36,8 +37,12 @@ def check_randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
     # are generated no matter the duplicated file settings
     dup_rng = PrngSha256(seed) 
     dup = []
+    soft_rng = PrngSha256(seed) 
+    soft = []
     for path, dirs, files in os.walk(root / name):
         for f in files:
+            if os.path.islink(os.path.join(path,f)):
+                continue
             file_path = os.path.join(path,f)
             if n_duplicated_files > 0:
                 if len(dup) < n_duplicated_files:
@@ -45,6 +50,12 @@ def check_randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
                 else:
                     pos = dup_rng.randint(0,n_duplicated_files-1)
                     dup[pos] = file_path
+            if n_soft_links > 0:
+                if len(soft) < n_soft_links:
+                    soft.append(file_path)
+                else:
+                    pos = soft_rng.randint(0,n_soft_links-1)
+                    soft[pos] = file_path
             file_size = min(remaining,dat_rng.randint(0,2*average_size))
             remaining -= file_size
             with open(file_path,'rb') as file:
@@ -52,21 +63,18 @@ def check_randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
                 expected = bytes(dat)
                 actual = file.read()
                 assert expected == actual, file_path
-    cnt = 0
-    for f in dup:
-        fn = "%d.dup"%cnt
-        assert filecmp.cmp(f,root / name / fn,shallow=False)
-        cnt += 1
+    check_dup_files(dup,root,name)
+    check_soft_links(soft,root,name)
 
-
-def randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
+def randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0,n_soft_links=0):
     dirs = seedir.randomdir(name=name,seed=seed)
     nfiles = 0
     size = size_mb * 1024 * 1024
     dirs.realize(root)
     for path, dirs, files in os.walk(root / name):
         for f in files:
-            nfiles += 1
+            if not os.path.islink(os.path.join(path,f)):
+                nfiles += 1
     average_size = size // nfiles
     remaining = size
     dat_rng = PrngSha256(seed)
@@ -74,6 +82,8 @@ def randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
     # are generated no matter the duplicated file settings
     dup_rng = PrngSha256(seed) 
     dup = []
+    soft_rng = PrngSha256(seed) 
+    soft = []
     for path, dirs, files in os.walk(root / name):
         for f in files:
             file_path = os.path.join(path,f)
@@ -83,21 +93,60 @@ def randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
                 else:
                     pos = dup_rng.randint(0,n_duplicated_files-1)
                     dup[pos] = file_path
+            if n_soft_links > 0:
+                if len(soft) < n_soft_links:
+                    soft.append(file_path)
+                else:
+                    pos = soft_rng.randint(0,n_soft_links-1)
+                    soft[pos] = file_path
             file_size = min(remaining,dat_rng.randint(0,2*average_size))
             remaining -= file_size
             with open(file_path,'wb') as file:
                 dat = dat_rng.randbytes(file_size)
                 file.write(dat)
+    create_dup_files(dup,root,name)
+    create_soft_links(soft,root,name)
+
+
+def create_dup_files(dup,root,name):
     cnt = 0
     for f in dup:
         fn = "%d.dup"%cnt
         shutil.copyfile(f,root / name / fn)
+        cnt += 1                
+
+def check_dup_files(dup,root,name):
+    cnt = 0
+    for f in dup:
+        fn = "%d.dup"%cnt
+        assert filecmp.cmp(f,root / name / fn,shallow=False)
+        cnt += 1                
+
+
+def create_soft_links(soft,root,name):
+    cnt = 0
+    base = root / name
+    for f in soft:
+        fn = "%d.soft"%cnt
+        rel_path = Path(f).relative_to(base)
+        os.symlink(rel_path, base / fn)
         cnt += 1
 
-            
+def check_soft_links(soft,root,name):
+    cnt = 0
+    base = root / name
+    for f in soft:
+        fn = "%d.soft"%cnt
+        rel_path = str(Path(f).relative_to(base))
+        actual = os.readlink(base / fn)
+        assert actual == rel_path
+        cnt += 1
 
 if not random_tree_root.exists():    
-    randomdir(root=test_root,name=random_tree_name,n_duplicated_files=3)
+    randomdir(root=test_root,
+              name=random_tree_name,
+              n_duplicated_files=3,
+              n_soft_links=4)
 
 if not files_path.exists():
     files_path.mkdir(parents=True)
@@ -182,7 +231,7 @@ def check_dedup_remove():
     cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
     cli.cmd_dedup(src=arch,hardlink=False)
     cli.cmd_export(src=arch, dst=out, recursive=True)
-    check_randomdir(root=out_path,name=random_tree_name,n_duplicated_files=0)
+    check_randomdir(root=out_path,name=random_tree_name,n_duplicated_files=0,n_soft_links=4)
 
 def check_export_file():
     clean()

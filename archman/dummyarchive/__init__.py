@@ -117,7 +117,7 @@ class DummyArchive(Archive):
             raise FileExistsError(str(d))
         if not d_parent.exists():
             raise FileNotFoundError(str(d_parent))
-        shutil.copytree(src=s,dst=d,symlinks=False) # TODO: handle symlinks
+        shutil.copytree(src=s,dst=d,symlinks=True) # symlinks are preserved
     
     def delete_file(self, dst:str) -> None:
         logging.info('deleting file ' + str(dst) + ' from archive' + str(self.root_path))
@@ -199,7 +199,7 @@ class DummyArchive(Archive):
             raise FileExistsError(str(d))
         if not d_parent.exists():
             raise FileNotFoundError(str(d_parent))
-        shutil.copytree(src=s,dst=d,symlinks=False) # TODO: handle symlinks
+        shutil.copytree(src=s,dst=d,symlinks=True) # preserve symlinks
  
     def dedup(self, src: str, hardlink=False) -> None:
         src_dir = Path(src).resolve()
@@ -210,6 +210,9 @@ class DummyArchive(Archive):
         for path, dirs, files in os.walk(src_dir):
             for f in files:
                 file_path = os.path.join(path,f)
+                if os.path.islink(file_path):
+                    print("soft link found: %s"%file_path)
+                    continue
                 dat = open(file_path,'rb').read()
                 dig = hashlib.sha256(dat).digest()
                 if dig in index:

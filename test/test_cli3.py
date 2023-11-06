@@ -1,4 +1,4 @@
-from archman import cli
+from archman import cli, FsUtils
 from archman.sqlarchive import params
 import os
 import stat
@@ -114,27 +114,10 @@ if not dirs_path.exists():
         dp = dirs_path / dn
         dp.mkdir()
 
-def rmtree(path):
-    if not os.path.exists(path):
-        return
-    DIR_READ_WRITE = 0o700
-    FILE_READ_WRITE = 0o600
-    def remove_readonly(func, path, _):
-        "Clear the readonly bit and reattempt the removal"
-        os.chmod(path, FILE_READ_WRITE)
-        func(path)
-
-    # set all directories as read/write
-    os.chmod(path, DIR_READ_WRITE)
-    for root, dirs, files in os.walk(path):
-        for d in dirs:
-            os.chmod(os.path.join(root, d), DIR_READ_WRITE)
-
-    shutil.rmtree(path, onerror=remove_readonly)
 
 def clean():
-    rmtree(str(archive_root))
-    rmtree(str(out_path))
+    FsUtils.rmtree(str(archive_root))
+    FsUtils.rmtree(str(out_path))
     out_path.mkdir()
 
 def gen_list_expected_output(path:Path, recursive = False, max_depth=None):
@@ -237,6 +220,27 @@ def check_move():
     shutil.move(tmp / dorg, tmp / dnew) 
     check_dirs_equal(tmp,arch)
 
+def check_delete():
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    arch = archive_root / random_tree_name
+    out = out_path / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    for root,dirs,files in os.walk(random_tree_root):
+        forg = os.path.join(root,files[0])
+        dorg = os.path.join(root,dirs[1])
+        break
+    forg = Path(forg).relative_to(random_tree_root)
+    dorg = Path(dorg).relative_to(random_tree_root)
+    cli.cmd_delete(dst=arch / forg)
+    cli.cmd_delete(dst=arch / dorg, recursive=True)
+    cli.cmd_export(src=arch, dst=out, recursive=True)
+    tmp = out_path / 'expected'
+    shutil.copytree(random_tree_root,tmp)
+    os.remove(tmp / forg)
+    FsUtils.rmtree(tmp / dorg) 
+    check_dirs_equal(tmp,arch)
+
 def test_it():
     check_list_empty()
     check_list_generic()
@@ -244,6 +248,7 @@ def test_it():
     check_export_dir()
     check_dedup_remove()
     check_move()
+    check_delete()
 
 
 if __name__ == '__main__':

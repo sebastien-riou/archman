@@ -91,7 +91,7 @@ class DummyArchive(Archive):
         s = s_parent.joinpath(src_file)
         d = Path(dst).resolve()
         d_parent = d.parent
-        logging.info('adding ' + str(s) + ' to ' + str(d) + ' in archive' + str(self.root_path))
+        logging.info('adding file ' + str(s) + ' to ' + str(d) + ' in archive' + str(self.root_path))
         if not s.exists():
             raise FileNotFoundError(str(s))
         if not s.is_file():
@@ -108,7 +108,7 @@ class DummyArchive(Archive):
         s = s_parent.joinpath(src_file)
         d = Path(dst).resolve()
         d_parent = d.parent
-        logging.info('adding ' + str(s) + ' to ' + str(d) + ' in archive' + str(self.root_path))
+        logging.info('adding directory ' + str(s) + ' to ' + str(d) + ' in archive' + str(self.root_path))
         if not s.exists():
             raise FileNotFoundError(str(s))
         if s.is_file():
@@ -120,9 +120,11 @@ class DummyArchive(Archive):
         shutil.copytree(src=s,dst=d,symlinks=False) # TODO: handle symlinks
     
     def delete_file(self, dst:str) -> None:
+        logging.info('deleting file ' + str(dst) + ' from archive' + str(self.root_path))
         os.remove(dst)
     
     def delete_dir(self, dst:str) -> None:
+        logging.info('deleting directory ' + str(dst) + ' from archive' + str(self.root_path))
         FsUtils.rmtree(dst)
 
     def update_file(self, src: str, dst:str) -> None:
@@ -135,7 +137,7 @@ class DummyArchive(Archive):
         s = s_parent.joinpath(src_file)
         d = Path(dst).resolve()
         d_parent = d.parent
-        logging.info('moving ' + str(s) + ' to ' + str(d) + ' within archive' + str(self.root_path))
+        logging.info('moving file ' + str(s) + ' to ' + str(d) + ' within archive' + str(self.root_path))
         if not s.exists():
             raise FileNotFoundError(str(s))
         if not s.is_file():
@@ -150,7 +152,7 @@ class DummyArchive(Archive):
         s = Path(src).resolve()
         d = Path(dst).resolve()
         d_parent = d.parent
-        logging.info('moving ' + str(s) + ' to ' + str(d) + ' within archive' + str(self.root_path))
+        logging.info('moving directory ' + str(s) + ' to ' + str(d) + ' within archive' + str(self.root_path))
         if not s.exists():
             raise FileNotFoundError(str(s))
         if s.is_file():
@@ -170,7 +172,7 @@ class DummyArchive(Archive):
         s = s_parent.joinpath(src_file)
         d = Path(dst).resolve()
         d_parent = d.parent
-        logging.info('exporting ' + str(s) + ' to ' + str(d) + ' from archive' + str(self.root_path))
+        logging.info('exporting file ' + str(s) + ' to ' + str(d) + ' from archive' + str(self.root_path))
         if not s.exists():
             raise FileNotFoundError(str(s))
         if not s.is_file():
@@ -188,7 +190,7 @@ class DummyArchive(Archive):
         s = s_parent.joinpath(src_file)
         d = Path(dst).resolve()
         d_parent = d.parent
-        logging.info('exporting ' + str(s) + ' to ' + str(d) + ' from archive' + str(self.root_path))
+        logging.info('exporting directory ' + str(s) + ' to ' + str(d) + ' from archive' + str(self.root_path))
         if not s.exists():
             raise FileNotFoundError(str(s))
         if s.is_file():

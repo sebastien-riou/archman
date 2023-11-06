@@ -97,7 +97,7 @@ def randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
             
 
 if not random_tree_root.exists():    
-    randomdir(root=test_root,name=random_tree_name,n_duplicated_files=0)
+    randomdir(root=test_root,name=random_tree_name,n_duplicated_files=3)
 
 if not files_path.exists():
     files_path.mkdir(parents=True)
@@ -182,7 +182,7 @@ def check_dedup_remove():
     cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
     cli.cmd_dedup(src=arch,hardlink=False)
     cli.cmd_export(src=arch, dst=out, recursive=True)
-    check_randomdir(root=test_root,name=random_tree_name,n_duplicated_files=0)
+    check_randomdir(root=out_path,name=random_tree_name,n_duplicated_files=0)
 
 def check_export_file():
     clean()

@@ -214,7 +214,7 @@ class DummyArchive(Archive):
                 dig = hashlib.sha256(dat).digest()
                 if dig in index:
                     org = index[dig]
-                    if not DummyArchive.are_hardlinked(org,file_path):
+                    if not FsUtils.are_hardlinked(org,file_path):
                         logging.info("duplicated files found: %s and %s"%(org,file_path))
                         if org.endswith(".dup"):
                             keep = file_path

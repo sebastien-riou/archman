@@ -241,7 +241,7 @@ if __name__ == '__main__':
 
     # list command
     parser_list.add_argument('src', help='Source path', type=str)
-    parser_list.add_argument('--hardlinks', help='list files hardlinked with src', action='store_true')
+    #parser_list.add_argument('--hardlinks', help='list files hardlinked with src', action='store_true')
     
     # dedup command
     parser_dedup.add_argument('src', help='Source path', type=str)

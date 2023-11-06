@@ -9,7 +9,7 @@ Limitations:
 from pathlib import Path, PurePath
 import os
 from archman.dummyarchive import params
-from archman import Archive,NotAFileError,BaseDir,BaseFile
+from archman import Archive,NotAFileError,FsUtils,BaseDir,BaseFile
 import logging
 import shutil
 import hashlib
@@ -57,7 +57,7 @@ class DummyArchive(Archive):
         path = self.resolve_path(path)
         return path.is_dir
         
-    def list(self, path: Path, recursive = False):
+    def list(self, path: Path, recursive = False) -> dict:
         path = self.resolve_path(path)
         dirs = list()
         files = list()
@@ -100,7 +100,6 @@ class DummyArchive(Archive):
             raise FileExistsError(str(d))
         if not d_parent.exists():
             raise FileNotFoundError(str(d_parent))
-        
         shutil.copyfile(src=s,dst=d,follow_symlinks=False) # TODO: handle symlinks
         
     def add_dir(self, src: str, dst:str) -> None:
@@ -120,6 +119,48 @@ class DummyArchive(Archive):
             raise FileNotFoundError(str(d_parent))
         shutil.copytree(src=s,dst=d,symlinks=False) # TODO: handle symlinks
     
+    def delete_file(self, dst:str) -> None:
+        os.remove(dst)
+    
+    def delete_dir(self, dst:str) -> None:
+        FsUtils.rmtree(dst)
+
+    def update_file(self, src: str, dst:str) -> None:
+        self.delete_file(dst)
+        self.add_file(src=src,dst=dst)
+
+    def move_file(self, src: str, dst:str) -> None:
+        src_file = Path(src).name
+        s_parent = Path(src).parent.resolve()
+        s = s_parent.joinpath(src_file)
+        d = Path(dst).resolve()
+        d_parent = d.parent
+        logging.info('moving ' + str(s) + ' to ' + str(d) + ' within archive' + str(self.root_path))
+        if not s.exists():
+            raise FileNotFoundError(str(s))
+        if not s.is_file():
+            raise NotAFileError(str(s))
+        if d.exists():
+            raise FileExistsError(str(d))
+        if not d_parent.exists():
+            raise FileNotFoundError(str(d_parent))
+        shutil.move(src,dst)
+
+    def move_dir(self, src: str, dst:str) -> None:
+        s = Path(src).resolve()
+        d = Path(dst).resolve()
+        d_parent = d.parent
+        logging.info('moving ' + str(s) + ' to ' + str(d) + ' within archive' + str(self.root_path))
+        if not s.exists():
+            raise FileNotFoundError(str(s))
+        if s.is_file():
+            raise NotADirectoryError(str(s))
+        if d.exists():
+            raise FileExistsError(str(d))
+        if not d_parent.exists():
+            raise FileNotFoundError(str(d_parent))
+        shutil.move(src,dst)
+
     def commit(self) -> None:
         pass
     
@@ -157,18 +198,12 @@ class DummyArchive(Archive):
         if not d_parent.exists():
             raise FileNotFoundError(str(d_parent))
         shutil.copytree(src=s,dst=d,symlinks=False) # TODO: handle symlinks
-
-    @staticmethod
-    def are_hardlinked(f1, f2):
-        if not (os.path.isfile(f1) and os.path.isfile(f2)):
-            return False
-        return os.path.samefile(f1, f2) or (os.stat(f1).st_ino == os.stat(f2).st_ino)
-    
-    def dedup(self, src: str, hardlink=False):
+ 
+    def dedup(self, src: str, hardlink=False) -> None:
         src_dir = Path(src).resolve()
         if not src_dir.is_dir():
             raise NotADirectoryError(str(src_dir))
-        print("dedup %s"%src_dir)
+        logging.info("dedup %s"%src_dir)
         index = {}
         for path, dirs, files in os.walk(src_dir):
             for f in files:
@@ -178,7 +213,7 @@ class DummyArchive(Archive):
                 if dig in index:
                     org = index[dig]
                     if not DummyArchive.are_hardlinked(org,file_path):
-                        print("duplicated files found: %s and %s"%(org,file_path))
+                        logging.info("duplicated files found: %s and %s"%(org,file_path))
                         if org.endswith(".dup"):
                             keep = file_path
                             other = org

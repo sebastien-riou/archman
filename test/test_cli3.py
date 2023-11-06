@@ -174,8 +174,11 @@ def check_list_generic():
     cli.cmd_add(src=random_tree_root,dst=dst, recursive=True)
     out = cli.cmd_list(src=dst,recursive=True)
     check_str_equal(out,expected)
-    cmp = dircmp(random_tree_root,dst)
+
+def check_dirs_equal(a,b):
+    cmp = dircmp(a,b)
     assert 0 == len(cmp.left_only)
+    assert 0 == len(cmp.right_only)
     assert 0 == len(cmp.diff_files)
 
 def check_export_dir():
@@ -186,9 +189,7 @@ def check_export_dir():
     cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
     cli.cmd_dedup(src=arch,hardlink=True)
     cli.cmd_export(src=arch, dst=out, recursive=True)
-    cmp = dircmp(random_tree_root,out)
-    assert 0 == len(cmp.left_only)
-    assert 0 == len(cmp.diff_files)
+    check_dirs_equal(random_tree_root,out)
 
 def check_dedup_remove():
     clean()
@@ -199,7 +200,6 @@ def check_dedup_remove():
     cli.cmd_dedup(src=arch,hardlink=False)
     cli.cmd_export(src=arch, dst=out, recursive=True)
     check_randomdir(root=test_root,name=random_tree_name,n_duplicated_files=0)
-
 
 def check_export_file():
     clean()
@@ -212,7 +212,30 @@ def check_export_file():
     cli.cmd_export(src=arch, dst=out)
     assert filecmp.cmp(org,out,shallow=False)
 
-
+def check_move():
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    arch = archive_root / random_tree_name
+    out = out_path / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    for root,dirs,files in os.walk(random_tree_root):
+        forg = os.path.join(root,files[0])
+        fnew = os.path.join(root,dirs[0],files[0])
+        dorg = os.path.join(root,dirs[1])
+        dnew = os.path.join(root,dirs[2],dirs[1])
+        break
+    forg = Path(forg).relative_to(random_tree_root)
+    fnew = Path(fnew).relative_to(random_tree_root) 
+    dorg = Path(dorg).relative_to(random_tree_root)
+    dnew = Path(dnew).relative_to(random_tree_root)
+    cli.cmd_move(src=arch / forg,dst=arch / fnew)
+    cli.cmd_move(src=arch / dorg,dst=arch / dnew, recursive=True)
+    cli.cmd_export(src=arch, dst=out, recursive=True)
+    tmp = out_path / 'expected'
+    shutil.copytree(random_tree_root,tmp)
+    shutil.move(tmp / forg, tmp / fnew)
+    shutil.move(tmp / dorg, tmp / dnew) 
+    check_dirs_equal(tmp,arch)
 
 def test_it():
     check_list_empty()
@@ -220,6 +243,7 @@ def test_it():
     check_export_file()
     check_export_dir()
     check_dedup_remove()
+    check_move()
 
 
 if __name__ == '__main__':

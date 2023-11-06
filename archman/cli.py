@@ -4,6 +4,7 @@ import os
 from pathlib import Path, PurePath
 import io
 from archman.dummyarchive import DummyArchive as ArchiveImpl
+from archman import NotAFileError
            
 def check_recursive(*, path:str, recursive:bool):
     isdir = os.path.isdir(path)
@@ -23,6 +24,17 @@ def check_dir(*, path:str, expected_to_exist=True):
         isdir = os.path.isdir(path)
         if not isdir:
             raise NotADirectoryError(path)
+
+def check_file(*, path:str, may_not_exist=False):
+    exist = os.path.exists(path)
+    if not exist:
+        if may_not_exist:
+            return
+        else:
+            raise FileNotFoundError(path)
+    isdir = os.path.isdir(path)
+    if isdir:
+        raise NotAFileError(path)
 
 def path_to_archive(path):
     root = ArchiveImpl.get_archive_root(path)
@@ -55,17 +67,31 @@ def cmd_add(*,src:str, dst:str, recursive:bool=False) -> None:
         archive.add_file(src=src, dst=dst)
     archive.commit()
 
-def cmd_delete(args):
-    print(args)
+def cmd_args_delete(args):
+    cmd_delete(dst=args.dst, recursive=args.recursive)
 
-def cmd_rename(args):
-    print(args)
+def cmd_delete(dst:str, recursive:bool=False):
+    check_recursive(path=dst,recursive=recursive)
+    archive = path_to_archive(dst)
+    if recursive:
+        archive.delete_dir(dst)
+    else:
+        archive.delete_file(dst)
 
-def cmd_move(args):
-    print(args)
+def cmd_args_move(args):
+    cmd_move(src=args.src,dst=args.dst)
+
+def cmd_move(*,src:str, dst:str, recursive:bool=False):
+    check_recursive(path=src,recursive=recursive)
+    archive = path_to_archive(src)
+    if recursive:
+        archive.move_dir(src=src,dst=dst)
+    else:
+        archive.move_file(src=src,dst=dst)
+    archive.commit()
 
 def cmd_args_export(args):
-    pass
+    cmd_export(src=args.src,dst=args.dst, recursive=args.recursive)
 
 def cmd_export(*,src:str, dst:str, recursive:bool=False):
     check_recursive(path=src,recursive=recursive)
@@ -75,11 +101,17 @@ def cmd_export(*,src:str, dst:str, recursive:bool=False):
     else:
         archive.export_file(src=src, dst=dst)
 
-def cmd_update(args):
-    print(args)
+def cmd_args_update(args):
+    cmd_update(src=args.src,dst=args.dst)
+
+def cmd_update(*, src, dst):
+    check_file(path=src)
+    archive = path_to_archive(dst)
+    archive.update_file(src=src, dst=dst)
+    archive.commit()
 
 def cmd_args_list(args):
-    print(cmd_list(src=args.src,recursive=args.recursive),end='')
+    cmd_list(src=args.src,recursive=args.recursive)
 
 def cmd_list_core(*, archive:ArchiveImpl, path:Path, content:dict, parents_last=[]) -> str:
     out = io.StringIO()
@@ -123,13 +155,13 @@ def cmd_list_core(*, archive:ArchiveImpl, path:Path, content:dict, parents_last=
     return out.getvalue()
     
 def cmd_list(*, src:str, recursive:bool=False, hardlinks:bool=False) -> str:
+    root = ArchiveImpl.get_archive_root(src)
+    assert root.is_absolute()
+    archive = ArchiveImpl(str(root))
     if hardlinks:
         raise NotImplementedError()
     if not os.path.isdir(src):
         raise NotADirectoryError(src)
-    root = ArchiveImpl.get_archive_root(src)
-    assert root.is_absolute()
-    archive = ArchiveImpl(str(root))
     out = io.StringIO()
     path = Path(src).resolve()
     print("archive '"+str(root)+"':",file=out)
@@ -163,19 +195,17 @@ if __name__ == '__main__':
     parser_add = subparsers.add_parser('add', help='Add a file or a directory to an archive')
     parser_add.set_defaults(func=cmd_args_add)
     parser_delete = subparsers.add_parser('delete', help='Delete a file or a directory from an archive')
-    parser_delete.set_defaults(func=cmd_delete)
-    parser_rename = subparsers.add_parser('rename', help='Rename a file or a directory within the archive')
-    parser_rename.set_defaults(func=cmd_rename)
-    parser_move = subparsers.add_parser('move', help='Move a file or a directory within the archive')
+    parser_delete.set_defaults(func=cmd_args_delete)
+    parser_move = subparsers.add_parser('move', help='Move/rename a file or a directory within the archive')
     parser_move.set_defaults(func=cmd_move)
     parser_export = subparsers.add_parser('export', help='Output the content of a file or a directory')
-    parser_export.set_defaults(func=cmd_export)
+    parser_export.set_defaults(func=cmd_args_export)
     parser_update = subparsers.add_parser('update', help='Change the content of a file')
-    parser_update.set_defaults(func=cmd_update)
+    parser_update.set_defaults(func=cmd_args_update)
     parser_list = subparsers.add_parser('list', help='Output the content of a directory')
     parser_list.set_defaults(func=cmd_args_list)
     parser_dedup = subparsers.add_parser('dedup', help='Operations on files with equivalent content')
-    parser_dedup.set_defaults(func=cmd_dedup)
+    parser_dedup.set_defaults(func=cmd_args_dedup)
     
     # add common options
     for p in subparsers.choices.values():
@@ -195,15 +225,11 @@ if __name__ == '__main__':
     parser_add.add_argument('dst', help='Destination path', type=str)
     
     # delete command
-    parser_delete.add_argument('src', help='Source path', type=str)
-    
-    # rename command
-    parser_rename.add_argument('src', help='Source path', type=str)
-    parser_rename.add_argument('name', help='New name', type=str)
+    parser_delete.add_argument('dst', help='Target path', type=str)
     
     # move command
     parser_move.add_argument('src', help='Source path', type=str)
-    parser_move.add_argument('dst', help='Destination directory path', type=str)
+    parser_move.add_argument('dst', help='Destination path', type=str)
     
     # export command
     parser_export.add_argument('src', help='Source path', type=str)

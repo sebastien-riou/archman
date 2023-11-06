@@ -141,8 +141,12 @@ def cmd_list(*, src:str, recursive:bool=False, hardlinks:bool=False) -> str:
     print(str(rel_path.parts[-1])+mark, file=out)
     return out.getvalue()+cmd_list_core(archive=archive,path=rel_path,content=res)
     
-def cmd_dedup(args):
-    print(args)
+def cmd_args_dedup(args):
+    cmd_dedup(src=args.src,hardlink=args.hardlink)
+
+def cmd_dedup(*, src:str, hardlink=False):
+    archive = path_to_archive(src)
+    archive.dedup(src,hardlink)
 
 def get_archive_impl_files():
     return ArchiveImpl.get_impl_files()
@@ -215,8 +219,8 @@ if __name__ == '__main__':
     
     # dedup command
     parser_dedup.add_argument('src', help='Source path', type=str)
-    parser_dedup.add_argument('--hardlinks', help='Turn all equivalent files to hard links', action='store_true')
-    parser_dedup.add_argument('--softlinks', help='Turn all equivalent files to soft links', action='store_true')
+    parser_dedup.add_argument('--hardlink', help='Turn all equivalent files to hard links', action='store_true')
+    #parser_dedup.add_argument('--softlink', help='Turn all equivalent files to soft links', action='store_true')
     parser_dedup.add_argument('--remove', help='Delete all equivalent files', action='store_true')
     
     

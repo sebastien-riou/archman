@@ -4,7 +4,7 @@ import os
 import stat
 from pathlib import Path
 import shutil
-import random
+from archman.prng_sha256 import PrngSha256
 from seedir import FakeDir,FakeFile
 import seedir
 import io
@@ -13,6 +13,7 @@ from filecmp import dircmp
 import filecmp
 
 test_root = Path('playground')
+test_root.mkdir(exist_ok=True)
 archive_root = test_root / 'archive_root'
 fixtures_root = test_root / 'fixtures'
 files_path = fixtures_root / "files"
@@ -20,7 +21,45 @@ out_path = test_root / "out"
 random_tree_name = "random_tree"
 random_tree_root = test_root.joinpath(random_tree_name)
 
-def randomdir(*,root,name,seed=0,size_mb=1):
+
+def check_randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
+    dirs = seedir.randomdir(name=name,seed=seed)
+    nfiles = 0
+    size = size_mb * 1024 * 1024
+    for path, dirs, files in os.walk(root / name):
+        for f in files:
+            nfiles += 1
+    average_size = size // nfiles
+    remaining = size
+    dat_rng = PrngSha256(seed)
+    # Use another PRNG to ensure same dir and files 
+    # are generated no matter the duplicated file settings
+    dup_rng = PrngSha256(seed) 
+    dup = []
+    for path, dirs, files in os.walk(root / name):
+        for f in files:
+            file_path = os.path.join(path,f)
+            if n_duplicated_files > 0:
+                if len(dup) < n_duplicated_files:
+                    dup.append(file_path)
+                else:
+                    pos = dup_rng.randint(0,n_duplicated_files-1)
+                    dup[pos] = file_path
+            file_size = min(remaining,dat_rng.randint(0,2*average_size))
+            remaining -= file_size
+            with open(file_path,'rb') as file:
+                dat = dat_rng.randbytes(file_size)
+                expected = bytes(dat)
+                actual = file.read()
+                assert expected == actual, file_path
+    cnt = 0
+    for f in dup:
+        fn = "%d.dup"%cnt
+        assert filecmp.cmp(f,root / name / fn,shallow=False)
+        cnt += 1
+
+
+def randomdir(*,root,name,seed=0,size_mb=1,n_duplicated_files=0):
     dirs = seedir.randomdir(name=name,seed=seed)
     nfiles = 0
     size = size_mb * 1024 * 1024
@@ -30,17 +69,35 @@ def randomdir(*,root,name,seed=0,size_mb=1):
             nfiles += 1
     average_size = size // nfiles
     remaining = size
-    random.seed(seed)
+    dat_rng = PrngSha256(seed)
+    # Use another PRNG to ensure same dir and files 
+    # are generated no matter the duplicated file settings
+    dup_rng = PrngSha256(seed) 
+    dup = []
     for path, dirs, files in os.walk(root / name):
         for f in files:
-            file_size = min(remaining,random.randint(0,2*average_size))
+            file_path = os.path.join(path,f)
+            if n_duplicated_files > 0:
+                if len(dup) < n_duplicated_files:
+                    dup.append(file_path)
+                else:
+                    pos = dup_rng.randint(0,n_duplicated_files-1)
+                    dup[pos] = file_path
+            file_size = min(remaining,dat_rng.randint(0,2*average_size))
             remaining -= file_size
-            with open(os.path.join(path,f),'wb') as file:
-                file.write(random.randbytes(file_size))
+            with open(file_path,'wb') as file:
+                dat = dat_rng.randbytes(file_size)
+                file.write(dat)
+    cnt = 0
+    for f in dup:
+        fn = "%d.dup"%cnt
+        shutil.copyfile(f,root / name / fn)
+        cnt += 1
+
             
 
 if not random_tree_root.exists():    
-    randomdir(root=test_root,name=random_tree_name)
+    randomdir(root=test_root,name=random_tree_name,n_duplicated_files=0)
 
 if not files_path.exists():
     files_path.mkdir(parents=True)
@@ -127,10 +184,22 @@ def check_export_dir():
     arch = archive_root / random_tree_name
     out = out_path / random_tree_name
     cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    cli.cmd_dedup(src=arch,hardlink=True)
     cli.cmd_export(src=arch, dst=out, recursive=True)
     cmp = dircmp(random_tree_root,out)
     assert 0 == len(cmp.left_only)
     assert 0 == len(cmp.diff_files)
+
+def check_dedup_remove():
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    arch = archive_root / random_tree_name
+    out = out_path / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    cli.cmd_dedup(src=arch,hardlink=False)
+    cli.cmd_export(src=arch, dst=out, recursive=True)
+    check_randomdir(root=test_root,name=random_tree_name,n_duplicated_files=0)
+
 
 def check_export_file():
     clean()
@@ -143,11 +212,14 @@ def check_export_file():
     cli.cmd_export(src=arch, dst=out)
     assert filecmp.cmp(org,out,shallow=False)
 
+
+
 def test_it():
     check_list_empty()
     check_list_generic()
     check_export_file()
     check_export_dir()
+    check_dedup_remove()
 
 
 if __name__ == '__main__':

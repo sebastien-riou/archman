@@ -12,6 +12,7 @@ from archman.dummyarchive import params
 from archman import Archive,NotAFileError,BaseDir,BaseFile
 import logging
 import shutil
+import hashlib
 
 class DummyArchive(Archive):
     @staticmethod
@@ -156,3 +157,37 @@ class DummyArchive(Archive):
         if not d_parent.exists():
             raise FileNotFoundError(str(d_parent))
         shutil.copytree(src=s,dst=d,symlinks=False) # TODO: handle symlinks
+
+    @staticmethod
+    def are_hardlinked(f1, f2):
+        if not (os.path.isfile(f1) and os.path.isfile(f2)):
+            return False
+        return os.path.samefile(f1, f2) or (os.stat(f1).st_ino == os.stat(f2).st_ino)
+    
+    def dedup(self, src: str, hardlink=False):
+        src_dir = Path(src).resolve()
+        if not src_dir.is_dir():
+            raise NotADirectoryError(str(src_dir))
+        print("dedup %s"%src_dir)
+        index = {}
+        for path, dirs, files in os.walk(src_dir):
+            for f in files:
+                file_path = os.path.join(path,f)
+                dat = open(file_path,'rb').read()
+                dig = hashlib.sha256(dat).digest()
+                if dig in index:
+                    org = index[dig]
+                    if not DummyArchive.are_hardlinked(org,file_path):
+                        print("duplicated files found: %s and %s"%(org,file_path))
+                        if org.endswith(".dup"):
+                            keep = file_path
+                            other = org
+                        else:
+                            keep = org 
+                            other = file_path
+                        index[dig] = keep                        
+                        os.remove(other)
+                        if hardlink:
+                            os.link(keep,other)
+                else:
+                    index[dig] = file_path

@@ -15,6 +15,7 @@ import shutil
 import hashlib
 
 class DummyArchive(Archive):
+    
     @staticmethod
     def get_impl_files():
         return [params.INDEX_FILE]
@@ -182,7 +183,7 @@ class DummyArchive(Archive):
         if not d_parent.exists():
             raise FileNotFoundError(str(d_parent))
         
-        shutil.copyfile(src=s,dst=d,follow_symlinks=False) # TODO: handle symlinks
+        shutil.copyfile(src=s,dst=d,follow_symlinks=False) 
 
     def export_dir(self, src: str, dst:str) -> None:
         src_file = Path(src).name

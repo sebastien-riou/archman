@@ -41,6 +41,14 @@ class FsUtils(object):
 class Archive(object):
 
     @staticmethod
+    def get_impl_dirs():
+        return []
+    
+    @staticmethod
+    def get_impl_files():
+        return []
+    
+    @staticmethod
     def get_archive_root(path_within_archive: str) -> Path:
         raise NotImplementedError()
     

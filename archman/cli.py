@@ -3,7 +3,8 @@ import logging
 import os
 from pathlib import Path, PurePath
 import io
-from archman.dummyarchive import DummyArchive as ArchiveImpl
+#from archman.dummyarchive import DummyArchive as ArchiveImpl
+from archman.sqlarchive import SqlArchive as ArchiveImpl
 from archman import NotAFileError
            
 def check_recursive(*, path:str, recursive:bool):
@@ -179,6 +180,10 @@ def cmd_args_dedup(args):
 def cmd_dedup(*, src:str, hardlink=False):
     archive = path_to_archive(src)
     archive.dedup(src,hardlink)
+    archive.commit()
+
+def get_archive_impl_dirs():
+    return ArchiveImpl.get_impl_dirs()
 
 def get_archive_impl_files():
     return ArchiveImpl.get_impl_files()

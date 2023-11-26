@@ -172,7 +172,14 @@ def clean():
 def gen_list_expected_output(path:Path, recursive = False, max_depth=None):
     expected = io.StringIO()
     print("archive '%s':"%str(archive_root.absolute()),file=expected)
-    print(seedir.seedir(path=path,first='folders',sort=True,exclude_files=cli.get_archive_impl_files(), printout=False),file=expected)
+    print(
+        seedir.seedir(
+            path=path,first='folders',
+            sort=True,
+            exclude_folders=cli.get_archive_impl_dirs(),
+            exclude_files=cli.get_archive_impl_files(), 
+            printout=False),
+        file=expected)
     return expected.getvalue()
 
 def check_str_equal(actual,expected):
@@ -219,6 +226,15 @@ def check_export_dir():
     arch = archive_root / random_tree_name
     out = out_path / random_tree_name
     cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    cli.cmd_export(src=arch, dst=out, recursive=True)
+    check_dirs_equal(random_tree_root,out)
+
+def check_dedup_hardlink():
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    arch = archive_root / random_tree_name
+    out = out_path / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
     cli.cmd_dedup(src=arch,hardlink=True)
     cli.cmd_export(src=arch, dst=out, recursive=True)
     check_dirs_equal(random_tree_root,out)
@@ -244,7 +260,8 @@ def check_export_file():
     cli.cmd_export(src=arch, dst=out)
     assert filecmp.cmp(org,out,shallow=False)
 
-def check_move():
+def check_pure_move():
+    """change parent directory but don't change the name"""
     clean()
     cli.cmd_new(dst=str(archive_root))
     arch = archive_root / random_tree_name
@@ -255,6 +272,32 @@ def check_move():
         fnew = os.path.join(root,dirs[0],files[0])
         dorg = os.path.join(root,dirs[1])
         dnew = os.path.join(root,dirs[2],dirs[1])
+        break
+    forg = Path(forg).relative_to(random_tree_root)
+    fnew = Path(fnew).relative_to(random_tree_root) 
+    dorg = Path(dorg).relative_to(random_tree_root)
+    dnew = Path(dnew).relative_to(random_tree_root)
+    cli.cmd_move(src=arch / forg,dst=arch / fnew)
+    cli.cmd_move(src=arch / dorg,dst=arch / dnew, recursive=True)
+    cli.cmd_export(src=arch, dst=out, recursive=True)
+    tmp = out_path / 'expected'
+    shutil.copytree(random_tree_root,tmp)
+    shutil.move(tmp / forg, tmp / fnew)
+    shutil.move(tmp / dorg, tmp / dnew) 
+    check_dirs_equal(tmp,arch)
+
+def check_move():
+    """change parent directory and change the name"""
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    arch = archive_root / random_tree_name
+    out = out_path / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    for root,dirs,files in os.walk(random_tree_root):
+        forg = os.path.join(root,files[0])
+        fnew = os.path.join(root,dirs[0],files[0]+".moved")
+        dorg = os.path.join(root,dirs[1])
+        dnew = os.path.join(root,dirs[2],dirs[1]+".moved")
         break
     forg = Path(forg).relative_to(random_tree_root)
     fnew = Path(fnew).relative_to(random_tree_root) 
@@ -315,7 +358,9 @@ def test_it():
     check_list_generic()
     check_export_file()
     check_export_dir()
+    check_dedup_hardlink()
     check_dedup_remove()
+    check_pure_move()
     check_move()
     check_delete()
     check_update()

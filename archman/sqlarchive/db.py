@@ -137,7 +137,7 @@ class IndexDb(DbUtils):
             # create the root directory
             dfi = FolderIndex(
                 parent_id=None,
-                name = params.DATA_FOLDER,
+                name = params.ROOT_DIR,
                 mode = params.READ_WRITE)
             self.add_folder(dfi)
             self.commit()
@@ -162,7 +162,7 @@ class IndexDb(DbUtils):
             file.parent_id,
             file.name,
             file.digest,
-            file.mode
+            file.mode,
             )
         if file.parent_id is None:
             raise ValueError("parent_id cannot be null")
@@ -171,6 +171,31 @@ class IndexDb(DbUtils):
         cur.execute(''' INSERT INTO files(PARENT_UID,NAME,DIGEST,MODE)
               VALUES(?,?,?,?) ''', args)
     
+    def update_file(self, uid: int, val: FileIndex):
+        args = (
+            val.parent_id,
+            val.name,
+            val.digest,
+            val.mode,
+            uid,
+            )
+        if val.parent_id is None:
+            raise ValueError("parent_id cannot be null")
+        cur = self.conn.cursor()
+        cur.execute(''' UPDATE files 
+                    SET 
+                        PARENT_UID = ?,
+                        NAME = ?,
+                        DIGEST = ?,
+                        MODE = ?
+                    WHERE
+                        UID = ? 
+               ''', args)
+    
+    def delete_file(self, file_uid):
+        cur = self.conn.cursor()
+        cur.execute(''' DELETE FROM files WHERE UID=%d'''%file_uid)
+
     def add_folder(self, f: FolderIndex):
         args = (
             f.parent_id,
@@ -178,12 +203,32 @@ class IndexDb(DbUtils):
             f.mode
             )
         if f.parent_id is None:
-            if f.name != params.DATA_FOLDER:
+            if f.name != params.ROOT_DIR:
                 raise ValueError("parent_id cannot be null")
         # TODO: check if it exist already
         cur = self.conn.cursor()
         cur.execute(''' INSERT INTO folders(PARENT_UID,NAME,MODE)
               VALUES(?,?,?) ''', args)
+    
+    def update_folder(self, uid: int, val: FolderIndex):
+        args = (
+            val.parent_id,
+            val.name,
+            val.mode,
+            uid,
+            )
+        if val.parent_id is None:
+            if val.name != params.ROOT_DIR:
+                raise ValueError("parent_id cannot be null")
+        cur = self.conn.cursor()
+        cur.execute(''' UPDATE folders
+                    SET 
+                        PARENT_UID = ?,
+                        NAME = ?,
+                        MODE = ?
+                    WHERE
+                        UID = ? 
+               ''', args)
     
     @staticmethod
     def file_filter(*, file=None, parent_id=None, name=None, digest=None, mode=None):
@@ -270,7 +315,7 @@ class IndexDb(DbUtils):
 
     def folder_from_path(self, path) -> Tuple[int,FolderIndex]:
         p = Path(path).resolve()
-        pr = p.relative_to(self.root.joinpath(params.DATA_FOLDER))
+        pr = p.relative_to(self.root)
         parent_id = 1
         parent = None
         for part in pr.parts:
@@ -288,3 +333,39 @@ class IndexDb(DbUtils):
             # happens for the root directory
             parent = self.folder_from_uid(parent_id)
         return (parent_id,parent)
+    
+    def file_from_path(self, path: Path) -> Tuple[int,FileIndex]:
+        (parent_id,parent) = self.folder_from_path(path.parent)
+        res = list(self.files(parent_id = parent_id, name = path.name))
+        print(res)
+        assert len(res) == 1
+        return res[0]
+
+    def path_from_folder_uid(self, folder_uid) -> Path:
+        part_id = folder_uid
+        parts = list()
+        while(part_id is not None):
+            di = self.folder_from_uid(part_id)
+            parts.append(di.name)
+            part_id = di.parent_id
+        path = Path(self.root)
+        for part in reversed(parts):
+            path = path.joinpath(part)
+        return path
+
+    def path_from_file_uid(self, file_uid) -> Path:
+        fi = self.file_from_uid(file_uid)
+        path = self.path_from_folder_id(fi.parent_id)
+        path = path.joinpath(fi.name)
+        return path
+
+    def walk(self, path):
+        (parent_id,parent) = self.folder_from_path(path)
+        return self.walk_id(parent_id)
+    
+    def walk_id(self,parent_id):
+        files = list(self.files(parent_id = parent_id))
+        dirs = list(self.folders(parent_id = parent_id))
+        yield (parent_id,files,dirs)
+        for (id,dfi) in dirs:
+            yield from self.walk_id(id)

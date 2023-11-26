@@ -17,7 +17,7 @@ Note on robustness against bit rot: a single bit corruption within the storage m
 ## Features
 
 - [ ] detect data corruption
-- [ ] de duplicate files (replace by hard links)
+- [ ] de duplicate files (replace by hard links or remove)
 - [ ] correct errors / repair files based on several damaged copies
 
 ## Concept
@@ -32,6 +32,7 @@ A top level README.txt explains what archman is and points to online doc.
 
 ### Treatment of links
 Soft and hard links are stored "as is", ArchMan handle them like the OS.
-ArchMan creates hard links when it detect several files with identical content. Those hard links are marked in the index database (USER=0). The "dedup" command can turn those hard links into regular hard links (USER=1), soft links or regular files (all other hard linked files are then removed). 
+The "dedup" command can create hard links when it detects equivalent files
+and is invoked with "--hardlink".
 
 

@@ -55,6 +55,7 @@ def cmd_mkdir(*, dst:str) -> None:
     check_dir(path=dst,expected_to_exist=False)
     archive = path_to_archive(dst)
     print('create new directory',os.path.abspath(dst), 'in archive', archive)
+    raise NotImplementedError()
 
 def cmd_args_add(args):
     cmd_add(src=args.src,dst=args.dst,recursive=args.recursive)
@@ -78,6 +79,7 @@ def cmd_delete(dst:str, recursive:bool=False):
         archive.delete_dir(dst)
     else:
         archive.delete_file(dst)
+    archive.commit()
 
 def cmd_args_move(args):
     cmd_move(src=args.src,dst=args.dst)

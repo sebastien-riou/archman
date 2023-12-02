@@ -369,3 +369,23 @@ class IndexDb(DbUtils):
         yield (parent_id,files,dirs)
         for (id,dfi) in dirs:
             yield from self.walk_id(id)
+
+    def delete_folder(self, folder_uid):
+        # delete all files
+        args = (
+                folder_uid,
+                )
+        cur = self.conn.cursor()
+        cur.execute(''' DELETE FROM files
+                    WHERE
+                        PARENT_UID = ? 
+                ''', args)
+        # delete all sub folders
+        for uid,dir in self.folders(parent_id=folder_uid):
+            self.delete_folder(uid)
+        # delete folder
+        cur.execute(''' DELETE FROM folders
+                    WHERE
+                        UID = ? 
+                ''', args)
+    

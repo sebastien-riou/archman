@@ -209,12 +209,17 @@ class SqlArchive(Archive):
     def delete_dir(self, dst:str) -> None:
         logging.info('deleting directory ' + str(dst) + ' from archive' + str(self.root_path))
         FsUtils.rmtree(dst)
-        raise("TODO: delete in DB")
+        (id,f) = self.db.folder_from_path(dst)
+        self.db.delete_folder(id)
 
     def update_file(self, src: str, dst:str) -> None:
-        self.delete_file(dst)
-        self.add_file(src=src,dst=dst)
-        raise("TODO: update in DB")
+        #self.delete_file(dst)
+        #self.add_file(src=src,dst=dst)
+        s = Path(src)
+        d = Path(dst)
+        (id_f,f) = self.db.file_from_path(s)
+        dfi = self._compute_file_index(s,d)
+        self.db.update_file(uid=id_f,val=dfi)
 
     def move_file(self, src: str, dst:str) -> None:
         s = Path(src).resolve()

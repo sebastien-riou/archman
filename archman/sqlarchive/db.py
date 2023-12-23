@@ -337,7 +337,6 @@ class IndexDb(DbUtils):
     def file_from_path(self, path: Path) -> Tuple[int,FileIndex]:
         (parent_id,parent) = self.folder_from_path(path.parent)
         res = list(self.files(parent_id = parent_id, name = path.name))
-        print(res)
         assert len(res) == 1
         return res[0]
 

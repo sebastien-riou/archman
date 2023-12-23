@@ -8,6 +8,7 @@ import logging
 from archman.sqlarchive import params
 from archman import NotAFileError,FsUtils
 import pysatl
+import hashlib
 
 class SqlArchive(Archive):
 
@@ -41,6 +42,11 @@ class SqlArchive(Archive):
         #idx.chmod(mode=params.READ_ONLY)
         #root.chmod(mode=params.READ_ONLY)
         return SqlArchive(root_path)
+    
+    @staticmethod
+    def digest(data: bytes) -> bytes:
+        dig = hashlib.sha256(data).digest()
+        return dig
     
     def chmod(path, mode):
         Path(path).chmod(mode)
@@ -112,12 +118,13 @@ class SqlArchive(Archive):
         # update index database, in memory for now
         self._add_file_in_db(src=s,dst=d)
 
-    def _compute_file_hash(self,f: Path):
+    def _compute_file_hash(self,f: Path) -> bytes:
         if f.is_symlink():
             target = os.readlink(f)
-            digest = hash(target.encode('utf8'))
+            digest = self.digest(target.encode('utf8'))
         else:
-            digest = hash(f.read_bytes())
+            digest = self.digest(f.read_bytes())
+        logging.debug(pysatl.Utils.hexstr(digest) + ': '+str(f))
         return digest
 
     def _compute_file_index(self, src:Path, dst: Path = None):
@@ -217,7 +224,21 @@ class SqlArchive(Archive):
         #self.add_file(src=src,dst=dst)
         s = Path(src)
         d = Path(dst)
-        (id_f,f) = self.db.file_from_path(s)
+        d_parent = d.parent
+        logging.info('updating ' + str(d) + ' with ' + str(s) + ' in archive' + str(self.root_path))
+        if not s.exists():
+            raise FileNotFoundError(str(s))
+        if not s.is_file():
+            raise NotAFileError(str(s))
+        if not d.exists():
+            raise FileNotFoundError(str(d))
+        if not d_parent.exists():
+            raise FileNotFoundError(str(d_parent))
+        (id_f,f) = self.db.file_from_path(d)
+        # write the file within the archive
+        d_parent.chmod(params.READ_WRITE)
+        shutil.copyfile(src=s,dst=d,follow_symlinks=False)
+        d_parent.chmod(params.READ_ONLY)
         dfi = self._compute_file_index(s,d)
         self.db.update_file(uid=id_f,val=dfi)
 
@@ -297,8 +318,8 @@ class SqlArchive(Archive):
         if file_index.digest != dig:
             raise Exception("%s digest:\n%s\nexpected:\n%s"%(
                 str(path),
-                pysatl.Utils(dig),
-                pysatl.Utils(file_index.digest)
+                pysatl.Utils.hexstr(dig),
+                pysatl.Utils.hexstr(file_index.digest)
                 ))
 
     def check_exported_file_integrity(self, s: Path, d: Path, file_index: FileIndex):

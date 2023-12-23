@@ -346,7 +346,7 @@ def check_update():
     content = PrngSha256().randbytes(12)
     tmp = out_path / 'expected'
     shutil.copytree(random_tree_root,tmp)
-    with open(tmp / forg,'wb')as file:
+    with open(tmp / forg,'wb') as file:
         file.write(content)
     cli.cmd_update(src=tmp / forg, dst=arch / forg)
     cli.cmd_export(src=arch, dst=out, recursive=True)
@@ -369,5 +369,5 @@ def test_it():
 if __name__ == '__main__':
     import logging
     logging.basicConfig()
-    logging.getLogger().setLevel(logging.DEBUG) 
+    logging.getLogger().setLevel(logging.INFO) 
     test_it()

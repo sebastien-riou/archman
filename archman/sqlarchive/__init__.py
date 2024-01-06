@@ -6,7 +6,7 @@ from archman import Archive
 import shutil
 import logging
 from archman.sqlarchive import params
-from archman import NotAFileError,FsUtils
+from archman import NotAFileError,DirectoryNotFoundError,FsUtils
 import pysatl
 import hashlib
 
@@ -55,10 +55,11 @@ class SqlArchive(Archive):
         self.root_path = Path(root_path).resolve()
         assert user_root_path is None
         self.user_root_path = Path(root_path).resolve()
-        self.db_file = self.root_path.joinpath(params.INDEX_DIR,params.INDEX_FILE)
+        self.index_dir = self.root_path.joinpath(params.INDEX_DIR)
+        self.db_file = self.index_dir.joinpath(params.INDEX_FILE)
         self.db = IndexDb(self.db_file, root=root_path)
-        self.check_file = self.root_path.joinpath(params.INDEX_DIR,params.CHECK_FILE)
-        self.check = RepairInfo(self.check_file, self.db_file)
+        self.check_file = self.index_dir.joinpath(params.CHECK_FILE)
+        self.repair_info = RepairInfo(self.check_file, self.db_file)
 
     def resolve_path(self, path: Path):
         if not path.is_absolute():
@@ -395,3 +396,39 @@ class SqlArchive(Archive):
                             self.delete_file(other)
                 else:
                     index[dig] = file_path
+    
+    def check(self):
+        for root_id,files,dirs in self.db.walk(self.root_path):
+            root = self.db.path_from_folder_uid(root_id)
+            # get rid of UIDs
+            files = list(map(lambda x: x[1].name, files))
+            dirs = list(map(lambda x: x[1].name, dirs))
+            fs_files=[]
+            fs_dirs=[]
+            # check files and directories in FS are in DB
+            for fs_entry in root.iterdir():
+                if fs_entry.is_file():
+                    fs_files.append(fs_entry)
+                    if fs_entry.name not in files:
+                        raise FileExistsError(str(fs_entry)+' not in DB as a file')
+                else:
+                    fs_dirs.append(fs_entry)
+                    if fs_entry.name not in dirs:
+                        if fs_entry != self.index_dir:
+                            raise FileExistsError(str(fs_entry)+' not in DB as a directory')
+
+            # check files and directories in DB are in FS
+            for f in files:
+                sf = root / f
+                # check that the file exist
+                if sf not in fs_files:
+                    raise FileNotFoundError(sf)
+                # check its content match the digest in DB    
+                uid,dfi = self.db.file_from_path(sf)
+                self.check_file_integrity(sf,dfi)
+            
+            for d in dirs:
+                sd = root / d
+                # check the directory exist in FS
+                if sd not in fs_dirs:
+                    raise DirectoryNotFoundError(sd)

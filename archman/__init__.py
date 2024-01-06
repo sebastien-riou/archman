@@ -7,6 +7,11 @@ class NotAFileError(OSError):
     def __init__(self, msg=None):
         super().__init__("NotAFileError:"+str(msg))
 
+class DirectoryNotFoundError(OSError):
+    def __init__(self, msg=None):
+        super().__init__("DirectoryNotFoundError:"+str(msg))
+
+
 class FsUtils(object):
     def rmtree(path):
         if not os.path.exists(path):
@@ -92,7 +97,9 @@ class Archive(object):
     def dedup(self, src: str, hardlink=False) -> None:
         raise NotImplementedError()
 
-
+    def check(self) -> None:
+        raise NotImplementedError()
+    
 @dataclass(order=True)
 class BaseDir(object):
 

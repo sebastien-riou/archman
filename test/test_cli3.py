@@ -235,7 +235,9 @@ def check_dedup_hardlink():
     arch = archive_root / random_tree_name
     out = out_path / random_tree_name
     cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    cli.cmd_check(src=str(archive_root))
     cli.cmd_dedup(src=arch,hardlink=True)
+    cli.cmd_check(src=str(archive_root))
     cli.cmd_export(src=arch, dst=out, recursive=True)
     check_dirs_equal(random_tree_root,out)
 
@@ -245,7 +247,9 @@ def check_dedup_remove():
     arch = archive_root / random_tree_name
     out = out_path / random_tree_name
     cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    cli.cmd_check(src=str(archive_root))
     cli.cmd_dedup(src=arch,hardlink=False)
+    cli.cmd_check(src=str(archive_root))
     cli.cmd_export(src=arch, dst=out, recursive=True)
     check_randomdir(root=out_path,name=random_tree_name,n_duplicated_files=0,n_soft_links=4)
 

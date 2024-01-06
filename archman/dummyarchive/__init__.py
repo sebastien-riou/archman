@@ -232,3 +232,6 @@ class DummyArchive(Archive):
                             os.link(keep,other)
                 else:
                     index[dig] = file_path
+    
+    def check(self):
+        pass

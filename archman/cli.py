@@ -184,6 +184,13 @@ def cmd_dedup(*, src:str, hardlink=False):
     archive.dedup(src,hardlink)
     archive.commit()
 
+def cmd_args_check(args):
+    cmd_check(src=args.src)
+
+def cmd_check(*, src:str):
+    archive = path_to_archive(src)
+    archive.check()
+
 def get_archive_impl_dirs():
     return ArchiveImpl.get_impl_dirs()
 
@@ -213,6 +220,8 @@ if __name__ == '__main__':
     parser_list.set_defaults(func=cmd_args_list)
     parser_dedup = subparsers.add_parser('dedup', help='Operations on files with equivalent content')
     parser_dedup.set_defaults(func=cmd_args_dedup)
+    parser_check = subparsers.add_parser('check', help='Sanity check')
+    parser_check.set_defaults(func=cmd_args_check)
     
     # add common options
     for p in subparsers.choices.values():
@@ -256,6 +265,8 @@ if __name__ == '__main__':
     #parser_dedup.add_argument('--softlink', help='Turn all equivalent files to soft links', action='store_true')
     parser_dedup.add_argument('--remove', help='Delete all equivalent files', action='store_true')
     
+    # check command
+    parser_check.add_argument('src', help='Source path', type=str)
     
     args = parser.parse_args()
     logging.basicConfig(format='%(message)s', level=args.log_level)

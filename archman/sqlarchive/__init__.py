@@ -6,9 +6,11 @@ from archman import Archive
 import shutil
 import logging
 from archman.sqlarchive import params
-from archman import NotAFileError,DirectoryNotFoundError,FsUtils
+from archman import NotAFileError,DirectoryNotFoundError,FileIntegrityError,FsUtils
 import pysatl
 import hashlib
+
+
 
 class SqlArchive(Archive):
 
@@ -317,7 +319,7 @@ class SqlArchive(Archive):
     def check_file_integrity(self, path: Path, file_index: FileIndex):
         dig = self._compute_file_hash(path)
         if file_index.digest != dig:
-            raise Exception("%s digest:\n%s\nexpected:\n%s"%(
+            raise FileIntegrityError("%s digest:\n%s\nexpected:\n%s"%(
                 str(path),
                 pysatl.Utils.hexstr(dig),
                 pysatl.Utils.hexstr(file_index.digest)
@@ -411,12 +413,23 @@ class SqlArchive(Archive):
                     fs_files.append(fs_entry)
                     if fs_entry.name not in files:
                         raise FileExistsError(str(fs_entry)+' not in DB as a file')
-                else:
+                elif fs_entry.is_dir():
                     fs_dirs.append(fs_entry)
                     if fs_entry.name not in dirs:
                         if fs_entry != self.index_dir:
                             raise FileExistsError(str(fs_entry)+' not in DB as a directory')
-
+                elif fs_entry.is_symlink():
+                        #happens when the symlink is broken
+                        fs_files.append(fs_entry)
+                        if fs_entry.name not in files:
+                            raise FileExistsError(str(fs_entry)+' not in DB as a file (broken link ?)')
+                else:
+                    logging.debug(f"fs_entry={fs_entry}")
+                    logging.debug(f"fs_entry.is_file()={fs_entry.is_file()}")
+                    logging.debug(f"fs_entry.is_dir()={fs_entry.is_dir()}")
+                    logging.debug(f"fs_entry.is_symlink()={fs_entry.is_symlink()}")
+                    raise RuntimeError(str(fs_entry)+' not a file nor a dir nor a symlink!')
+                
             # check files and directories in DB are in FS
             for f in files:
                 sf = root / f

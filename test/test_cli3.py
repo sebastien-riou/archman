@@ -1,4 +1,4 @@
-from archman import cli, FsUtils
+from archman import cli, FsUtils,FileIntegrityError, DirectoryNotFoundError
 from archman.sqlarchive import params
 import os
 import stat
@@ -11,6 +11,7 @@ import io
 import difflib
 from filecmp import dircmp
 import filecmp
+import tempfile
 
 test_root = Path('playground')
 test_root.mkdir(exist_ok=True)
@@ -356,6 +357,78 @@ def check_update():
     cli.cmd_export(src=arch, dst=out, recursive=True)
     check_dirs_equal(tmp,arch)
 
+def corrupt_file(arch):
+    #corrupt it
+    for root,dirs,files in os.walk(arch):
+        forg = os.path.join(root,files[0])
+        logging.info(f"Corrupting {forg}")
+        with open(forg,"rb") as f:
+            b = bytearray(f.read())
+        with open(forg,"wb") as f:
+            b[0] = b[0] ^ 0x01
+            f.write(b)
+        break
+    #check
+    try:
+        cli.cmd_check(src=arch)
+        raise RuntimeError("Data corruption in data file NOT detected!")
+    except FileIntegrityError:
+        pass
+    #fix it
+    with open(forg,"wb") as f:
+        b[0] = b[0] ^ 0x01
+        f.write(b)
+    cli.cmd_check(src=arch)
+    
+def delete_data_file(arch):
+    for root,dirs,files in os.walk(arch):
+        forg = os.path.join(root,files[0])
+        logging.info(f"Deleting {forg}")
+        b=open(forg,"rb").read()
+        break
+    #delete it
+    os.remove(forg)
+    try:
+        cli.cmd_check(src=arch)
+        raise RuntimeError("Deleted data file NOT detected!")
+    except FileNotFoundError:
+        pass
+    #fix it
+    with open(forg,"wb") as f:
+        f.write(b)
+    cli.cmd_check(src=arch)
+
+def delete_data_folder(arch):
+    for root,dirs,files in os.walk(arch):
+        forg = os.path.join(root,dirs[0])
+        break
+    #delete it
+    fnew = os.path.join(tempfile.gettempdir() , "delete_data_folder")
+    logging.info(f"Deleting {forg} (moving to {fnew})")
+    os.rename(src=forg,dst=fnew)
+    try:
+        cli.cmd_check(src=arch)
+        raise RuntimeError("Deleted data file NOT detected!")
+    except DirectoryNotFoundError:
+        pass
+    finally:
+        #fix it
+        os.rename(src=fnew,dst=forg)
+    cli.cmd_check(src=arch)
+
+def check_check():
+    clean()
+    cli.cmd_new(dst=str(archive_root))
+    arch = archive_root / random_tree_name
+    cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
+    cli.cmd_check(src=arch)
+    #archive is good, now apply various corruptions and check they are caught
+    corrupt_file(arch)
+    delete_data_file(arch)
+    delete_data_folder(arch)
+    #final check that all corruptions have been repared
+    cli.cmd_check(src=arch)
+    
 
 def test_it():
     check_list_empty()
@@ -368,10 +441,11 @@ def test_it():
     check_move()
     check_delete()
     check_update()
+    check_check()
 
 
 if __name__ == '__main__':
     import logging
     logging.basicConfig()
-    logging.getLogger().setLevel(logging.INFO) 
+    logging.getLogger().setLevel(logging.DEBUG) 
     test_it()

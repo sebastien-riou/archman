@@ -11,6 +11,9 @@ class DirectoryNotFoundError(OSError):
     def __init__(self, msg=None):
         super().__init__("DirectoryNotFoundError:"+str(msg))
 
+class FileIntegrityError(OSError):
+    def __init__(self, msg=None):
+        super().__init__("FileIntegrityError:"+str(msg))
 
 class FsUtils(object):
     def rmtree(path):

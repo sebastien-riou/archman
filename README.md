@@ -17,7 +17,7 @@ Note on robustness against bit rot: a single bit corruption within the storage m
 ## Features
 
 - [ ] detect data corruption
-- [ ] de duplicate files (replace by hard links or remove)
+- [x] de duplicate files (replace by hard links or remove)
 - [ ] correct errors / repair files based on several damaged copies
 
 ## Concept
@@ -26,7 +26,7 @@ Archman works on top of any POSIX file system, an archive is a regular folder th
 - an index database: a standard sqlite3 file
 - a database check file: a custom binary file containing redundant information to check the integrity of the index database
 
-The index database and its check file are placed in a ".archman" folder to discourage users to touch them. User files are placed in a "data" folder. Everything in "data" folder is set as "read only + execute", the original access right are stored in the index database.
+The index database and its check file are placed in a ".archman" folder to discourage users to touch them. User files are placed just inside the archive folder. Everything in that folder is set as "read only + execute", the original access right are stored in the index database.
 
 A top level README.txt explains what archman is and points to online doc.
 
@@ -35,4 +35,15 @@ Soft and hard links are stored "as is", ArchMan handle them like the OS.
 The "dedup" command can create hard links when it detects equivalent files
 and is invoked with "--hardlink".
 
+### Repair
+There are several types of damage:
+- file content
+- file / directory name
+- low level file system structure which make everything unreadable
 
+The third kind can be corrected only with knowledge of the file system structure, ArchMan does not handle this.
+
+## How to test
+````
+pipenv run python -m test.test_cli3
+````

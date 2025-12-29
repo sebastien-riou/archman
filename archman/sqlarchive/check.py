@@ -1,5 +1,7 @@
 import os
-import hashlib 
+import hashlib
+
+from archman import FileIntegrityError 
 
 class RepairInfo(object):
     def __init__(self, path, target_path, *, create = False):
@@ -26,8 +28,8 @@ class RepairInfo(object):
                 digest = hashlib.sha256(fi.read()).digest()
             
             with open(path,'rb') as fi:
-                # dummy implementation: just compute sha256 over the whole file
                 ref_digest = fi.read()
             
-            assert digest == ref_digest
+            if digest != ref_digest:
+                raise FileIntegrityError(f"{path} vs {target_path} digest mismatch:\nreference digest: {ref_digest}\nactual digest: {digest}.")
             

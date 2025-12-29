@@ -15,6 +15,10 @@ class FileIntegrityError(OSError):
     def __init__(self, msg=None):
         super().__init__("FileIntegrityError:"+str(msg))
 
+class NotWithinArchiveError(OSError):
+    def __init__(self, msg=None):
+        super().__init__("NotWithinArchiveError:"+str(msg))
+
 class FsUtils(object):
     def rmtree(path):
         if not os.path.exists(path):

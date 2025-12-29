@@ -1,4 +1,4 @@
-from archman import cli, FsUtils,FileIntegrityError, DirectoryNotFoundError
+from archman import NotWithinArchiveError, cli, FsUtils,FileIntegrityError, DirectoryNotFoundError
 from archman.sqlarchive import params
 import os
 import stat
@@ -357,17 +357,14 @@ def check_update():
     cli.cmd_export(src=arch, dst=out, recursive=True)
     check_dirs_equal(tmp,arch)
 
-def corrupt_file(arch):
+def corrupt_file(target_file, arch):
     #corrupt it
-    for root,dirs,files in os.walk(arch):
-        forg = os.path.join(root,files[0])
-        logging.info(f"Corrupting {forg}")
-        with open(forg,"rb") as f:
-            b = bytearray(f.read())
-        with open(forg,"wb") as f:
-            b[0] = b[0] ^ 0x01
-            f.write(b)
-        break
+    logging.info(f"Corrupting {target_file}")
+    with open(target_file,"rb") as f:
+        b = bytearray(f.read())
+    with open(target_file,"wb") as f:
+        b[0] = b[0] ^ 0x01
+        f.write(b)
     #check
     try:
         cli.cmd_check(src=arch)
@@ -375,46 +372,80 @@ def corrupt_file(arch):
     except FileIntegrityError:
         pass
     #fix it
-    with open(forg,"wb") as f:
+    with open(target_file,"wb") as f:
         b[0] = b[0] ^ 0x01
         f.write(b)
     cli.cmd_check(src=arch)
-    
-def delete_data_file(arch):
+
+def corrupt_data_file(arch):
     for root,dirs,files in os.walk(arch):
         forg = os.path.join(root,files[0])
-        logging.info(f"Deleting {forg}")
-        b=open(forg,"rb").read()
         break
+    corrupt_file(forg,arch)
+
+def corrupt_db_files(arch):
+    root = os.path.join(arch,cli.ArchiveImpl.get_impl_dirs()[0])
+    logging.debug(f"walking in {root}")
+    for root,dirs,files in os.walk(root):
+        for f in files:                       
+            forg = os.path.join(root,f)
+            corrupt_file(forg,arch)
+
+def delete_file(target_file, arch):
+    logging.info(f"Deleting {target_file}")
+    b=open(target_file,"rb").read()
     #delete it
-    os.remove(forg)
+    os.remove(target_file)
     try:
         cli.cmd_check(src=arch)
-        raise RuntimeError("Deleted data file NOT detected!")
+        raise RuntimeError("Deleted file NOT detected!")
     except FileNotFoundError:
         pass
     #fix it
-    with open(forg,"wb") as f:
+    with open(target_file,"wb") as f:
         f.write(b)
     cli.cmd_check(src=arch)
+
+def delete_data_file(arch):
+    for root,dirs,files in os.walk(arch):
+        forg = os.path.join(root,files[0])
+        break
+    delete_file(forg,arch)
+
+def delete_db_files(arch):
+    root = os.path.join(arch,cli.ArchiveImpl.get_impl_dirs()[0])
+    logging.debug(f"walking in {root}")
+    for root,dirs,files in os.walk(root):
+        for f in files:                       
+            forg = os.path.join(root,f)
+            delete_file(forg,arch)
+
+def delete_folder(target_folder, arch):
+    #delete it
+    fnew = os.path.join(tempfile.gettempdir() , "delete_folder")
+    logging.info(f"Deleting {target_folder} (moving to {fnew})")
+    os.rename(src=target_folder,dst=fnew)
+    try:
+        cli.cmd_check(src=arch)
+        raise RuntimeError("Deleted folder NOT detected!")
+    except (DirectoryNotFoundError, NotWithinArchiveError):
+        pass
+    finally:
+        #fix it
+        os.rename(src=fnew,dst=target_folder)
+    cli.cmd_check(src=arch)
+
 
 def delete_data_folder(arch):
     for root,dirs,files in os.walk(arch):
         forg = os.path.join(root,dirs[0])
         break
-    #delete it
-    fnew = os.path.join(tempfile.gettempdir() , "delete_data_folder")
-    logging.info(f"Deleting {forg} (moving to {fnew})")
-    os.rename(src=forg,dst=fnew)
-    try:
-        cli.cmd_check(src=arch)
-        raise RuntimeError("Deleted data file NOT detected!")
-    except DirectoryNotFoundError:
-        pass
-    finally:
-        #fix it
-        os.rename(src=fnew,dst=forg)
-    cli.cmd_check(src=arch)
+    delete_folder(forg,arch)
+
+def delete_db_folder(arch):
+    root = os.path.join(arch,cli.ArchiveImpl.get_impl_dirs()[0])
+    Path(arch).resolve().chmod(params.READ_WRITE)
+    delete_folder(root,arch)
 
 def check_check():
     clean()
@@ -423,9 +454,12 @@ def check_check():
     cli.cmd_add(src=random_tree_root,dst=arch, recursive=True)
     cli.cmd_check(src=arch)
     #archive is good, now apply various corruptions and check they are caught
-    corrupt_file(arch)
+    corrupt_data_file(arch)
     delete_data_file(arch)
     delete_data_folder(arch)
+    corrupt_db_files(archive_root)
+    delete_db_files(archive_root)
+    delete_db_folder(archive_root)
     #final check that all corruptions have been repared
     cli.cmd_check(src=arch)
     
@@ -447,5 +481,5 @@ def test_it():
 if __name__ == '__main__':
     import logging
     logging.basicConfig()
-    logging.getLogger().setLevel(logging.DEBUG) 
+    logging.getLogger().setLevel(logging.INFO) 
     test_it()

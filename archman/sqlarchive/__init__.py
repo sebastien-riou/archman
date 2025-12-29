@@ -2,7 +2,7 @@ from pathlib import Path,PurePath
 import os
 from archman.sqlarchive.db import IndexDb,FileIndex,FolderIndex
 from archman.sqlarchive.check import RepairInfo
-from archman import Archive
+from archman import Archive, NotWithinArchiveError
 import shutil
 import logging
 from archman.sqlarchive import params
@@ -27,7 +27,7 @@ class SqlArchive(Archive):
             t = r.joinpath(params.INDEX_DIR)
             if t.exists():
                 return r
-        raise Exception("'"+str(Path(p).resolve())+"' is not within an archive")
+        raise NotWithinArchiveError("'"+str(Path(p).resolve())+"' is not within an archive")
     
     @staticmethod
     def create_archive(root_path: str): # TODO: declar type of return value ('Archive' gives undefined error)
@@ -55,13 +55,15 @@ class SqlArchive(Archive):
 
     def __init__(self,root_path: str, user_root_path: str=None):
         self.root_path = Path(root_path).resolve()
-        assert user_root_path is None
+        if user_root_path is not None:
+            raise NotImplementedError()
         self.user_root_path = Path(root_path).resolve()
         self.index_dir = self.root_path.joinpath(params.INDEX_DIR)
         self.db_file = self.index_dir.joinpath(params.INDEX_FILE)
-        self.db = IndexDb(self.db_file, root=root_path)
         self.check_file = self.index_dir.joinpath(params.CHECK_FILE)
         self.repair_info = RepairInfo(self.check_file, self.db_file)
+        self.db = IndexDb(self.db_file, root=root_path)
+        
 
     def resolve_path(self, path: Path):
         if not path.is_absolute():

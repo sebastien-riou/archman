@@ -6,6 +6,7 @@ from typing import Generator
 from typing import Tuple
 from typing import Iterator
 from archman.sqlarchive import params
+import logging
 class DbUtils(object):
     @staticmethod
     def create_connection(db_file, *, create = False):
@@ -30,11 +31,12 @@ class DbUtils(object):
         :param create_table_sql: a CREATE TABLE statement
         :return:
         """
-        try:
-            c = conn.cursor()
-            c.execute(create_table_sql)
-        except Error as e:
-            print(e)
+        #try:
+        c = conn.cursor()
+        c.execute(create_table_sql)
+        #except Error as e:
+        #    logging.error(e)
+        #    raise RuntimeError("database corrupted",e)
 
     
     def _results(self, cursor, item=None):
@@ -97,7 +99,7 @@ class IndexDb(DbUtils):
         # create a database connection
         self.conn = DbUtils.create_connection(path,create=create)
         if self.conn is None:
-            raise Exception("cannot connect to database '%s'"%path)
+            raise RuntimeError("cannot connect to database '%s'"%path)
 
         DbUtils.create_table(self.conn, """ CREATE TABLE IF NOT EXISTS folders (
                                             UID integer PRIMARY KEY,
